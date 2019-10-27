@@ -1,7 +1,12 @@
+{- 4HC3 Assignment 5
+   Shabana Dhayananth, 400025944
+-}
+
 {- Paste this code input slot 0 or 1 of type </>
    Modify the code so that when you paste or type text into the text area, the bar chart shows the word count of the top 20 words.
    Add a scale.
 -}
+
 import Bootstrap.Alert as Alert
 import Bootstrap.Badge as Badge
 import Bootstrap.Button as Button
@@ -38,11 +43,12 @@ iconHeight = 64
 
 barChart wordCounts time =
   let
+    
     numWords = List.length wordCounts
     maxCount = List.maximum (List.map Tuple.first wordCounts) |> Maybe.withDefault 10
-    scaleHeight = iconHeight / toFloat maxCount
+    scaleHeight = (iconHeight - 3) / toFloat maxCount
 
-    width = iconWidth / toFloat numWords
+    width = (iconWidth - 5) / toFloat numWords
 
     growHeight y = if y < time then y else time
 
@@ -50,18 +56,30 @@ barChart wordCounts time =
         group [ GraphicSVG.rect width (growHeight <| scaleHeight * toFloat count)
                   |> filled (rgb 200 0 200)
                   |> move (0,0.5 * growHeight ( scaleHeight * toFloat count ) )
-              , GraphicSVG.text word |> GraphicSVG.size 5
+              , GraphicSVG.text word |> GraphicSVG.size 4
                   |> filled white
                   |> rotate (degrees 90)
                   |> move (0,3)
               ]
           |> move ( toFloat idx * width - 0.5 * iconWidth + 0.5 * width
                   , -0.5 * toFloat iconHeight)
-
+   
+    yscale (count) = 
+       group <| List.map (\yval -> group [GraphicSVG.text (String.fromInt yval) |> GraphicSVG.size 3
+                                              |> filled black
+                                              |> move (61, scaleHeight * toFloat yval - 0.5 * toFloat iconHeight)
+                                         , GraphicSVG.rect 1 0.5
+                                              |> filled black
+                                              |> move (60, scaleHeight * toFloat yval - 0.5 * toFloat iconHeight)
+                                         ]
+               ) (List.range 0 maxCount)
 
   in
-      [ -- put a scale here
+      [ GraphicSVG.rect 0.5 200
+                    |> filled black
+                    |> move (60, 0)
       ]
+      ++ (List.map yscale wordCounts)
       ++ (List.indexedMap bar wordCounts)
             |> group
 
@@ -165,12 +183,31 @@ update msg model =
             )
 
         NoOp -> (model, Cmd.none)
-
-        NewText txt -> ( {model | wordCounts = List.indexedMap ( \ idx wrd -> (idx,wrd) )
-                                                 <| String.words txt
+        
+        NewText txt -> ( {model | wordCounts = countMapped (String.words txt)
                                 , timeOfInput = model.time }, Cmd.none)
 
         Tick t -> ({ model | time = t }, Cmd.none)
+
+countMapped wordList = 
+    List.take 20 
+        (List.reverse 
+            (List.sortBy Tuple.first
+                (List.map (\tup -> (Tuple.second tup, Tuple.first tup))
+                    (Dict.toList
+                        (List.foldr (\wrd num -> Dict.update wrd 
+                                                    (\counter -> case counter of 
+                                                         Just currCount -> Just (currCount + 1)
+                                                         Nothing -> Just 1
+                                                    )
+                                                    num
+                                   )
+                                   Dict.empty wordList
+                         )
+                     )
+                 )
+              )
+          )
 
 urlUpdate : Url -> Model -> ( Model, Cmd Msg )
 urlUpdate url model =
